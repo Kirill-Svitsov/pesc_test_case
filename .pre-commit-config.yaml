@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.2.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        language_version: python3
+        args:
+          - --max-line-length=120
+          - --ignore=E203,W503
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run pytest
+        entry: bash -c 'source venv/bin/activate && pytest tests/ -x --tb=short'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

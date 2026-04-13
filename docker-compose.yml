@@ -1,0 +1,69 @@
+version: '3.8'
+
+networks:
+  svitsov_network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: svitsov_postgres
+    env_file:
+      - .env
+    ports:
+      - "${HOST_POSTGRES_PORT:-5422}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - svitsov_network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: svitsov_redis
+    ports:
+      - "${HOST_REDIS_PORT:-6367}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - svitsov_network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: svitsov_auth_app
+    ports:
+      - "${HOST_APP_PORT:-8055}:8055"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-15}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-7}
+    volumes:
+      - ./app:/app/app
+    networks:
+      - svitsov_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
